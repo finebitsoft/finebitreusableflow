@@ -48,7 +48,7 @@ jobs:
         if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/login-action@v2
         with:
-          username: ${{ vars.docker_hub_username }}
+          username: ${{ secrets.docker_hub_username }}
           password: ${{ secrets.docker_hub_password }}
 
       - name: Extract metadata (tags, labels) for Docker
