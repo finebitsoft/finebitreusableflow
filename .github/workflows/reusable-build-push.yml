@@ -1,8 +1,19 @@
 name: Build and Push
 
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
 on:
   workflow_call:
     inputs:
+      backend-path:
+        required: true
+        type: string
+      frontend-path:
+        required: true
+        type: string
       image_name:
         required: true
         type: string
@@ -15,16 +26,9 @@ on:
         required: true
       docker_hub_password:
         required: true
-
 jobs:
-  build-push:
+  build-backend:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -38,10 +42,11 @@ jobs:
 
       - name: Build and Package
         run: ./mvnw clean package -B -DskipTests
+        working-directory: ${{ inputs.backend-path }}
 
       - name: Dockerhub Login
         if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.docker_hub_username }}
           password: ${{ secrets.docker_hub_password }}
@@ -61,3 +66,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+  build-frontend:
+    runs-on: ubuntu-latest
+    name: Build Ionic Frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'v18.20.8'
+
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: ${{ inputs.frontend-path }}
