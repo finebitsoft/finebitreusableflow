@@ -78,5 +78,5 @@ jobs:
           node-version: 'v18.20.8'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
         working-directory: ${{ inputs.frontend-path }}
