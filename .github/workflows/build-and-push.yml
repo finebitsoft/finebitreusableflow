@@ -15,6 +15,10 @@ on:
         required: true
       docker_hub_password:
         required: true
+      jwt_private_key:
+        required: true
+      jwt_public_key:
+        required: true
 
 jobs:
   build-push:
@@ -35,6 +39,18 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      - name: Create key directory
+        run: mkdir -p ${{ inputs.backend-path }}/src/main/resources/keys
+
+      - name: Inject JWT Keys
+        run: |
+          echo "${{ secrets.jwt_private_key }}" > ${{ inputs.backend-path }}/src/main/resources/keys/private_key.pem
+          echo "${{ secrets.jwt_public_key }}"  > ${{ inputs.backend-path }}/src/main/resources/keys/public_key.pem
+          shell: bash
+
+      - name: Secure permissions for key files
+        run: chmod 600 ${{ inputs.backend-path }}/src/main/resources/keys/*.pem
 
       - name: Build and Package
         run: ./mvnw clean package -B -DskipTests
