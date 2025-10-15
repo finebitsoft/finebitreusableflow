@@ -1,19 +1,8 @@
-name: Build and Push
+name: "Reusable Build and Push"
 
-permissions:
-  contents: read
-  packages: write
-  attestations: write
-  id-token: write
 on:
   workflow_call:
     inputs:
-      backend-path:
-        required: true
-        type: string
-      frontend-path:
-        required: true
-        type: string
       image_name:
         required: true
         type: string
@@ -21,14 +10,31 @@ on:
         required: false
         type: string
         default: .
+      backend_path:
+        required: false
+        type: string
+      frontend_path:
+        required: false
+        type: string
     secrets:
       docker_hub_username:
         required: true
       docker_hub_password:
         required: true
+      jwt_private_key:
+        required: true
+      jwt_public_key:
+        required: true
+
 jobs:
-  build-backend:
+  build-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -42,41 +48,29 @@ jobs:
 
       - name: Build and Package
         run: ./mvnw clean package -B -DskipTests
-        working-directory: ${{ inputs.backend-path }}
+        env:
+          JWT_PRIVATE_KEY: ${{ secrets.jwt_private_key }}
+          JWT_PUBLIC_KEY: ${{ secrets.jwt_public_key }}
 
       - name: Dockerhub Login
-        if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.docker_hub_username }}
           password: ${{ secrets.docker_hub_password }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
+      - name: Extract metadata for Docker
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ vars.REGISTRY }}/${{ inputs.image_name }}
 
       - name: Build and Push Docker Image
-        if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/build-push-action@v4
         with:
           context: ${{ inputs.context }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-  build-frontend:
-    runs-on: ubuntu-latest
-    name: Build Ionic Frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'v20.19.2'
-
-      - name: Install Dependencies
-        run: npm install
-        working-directory: ${{ inputs.frontend-path }}
