@@ -1,4 +1,4 @@
-name: Build and Push
+name: "Reusable Build and Push"
 
 on:
   workflow_call:
@@ -10,6 +10,12 @@ on:
         required: false
         type: string
         default: .
+      backend_path:
+        required: false
+        type: string
+      frontend_path:
+        required: false
+        type: string
     secrets:
       docker_hub_username:
         required: true
@@ -47,21 +53,21 @@ jobs:
           JWT_PUBLIC_KEY: ${{ secrets.jwt_public_key }}
 
       - name: Dockerhub Login
-        if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
-        uses: docker/login-action@v1
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.docker_hub_username }}
           password: ${{ secrets.docker_hub_password }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
+      - name: Extract metadata for Docker
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ vars.REGISTRY }}/${{ inputs.image_name }}
 
       - name: Build and Push Docker Image
-        if: contains(fromJSON('["refs/heads/main", "refs/heads/develop"]'), github.ref) || startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/build-push-action@v4
         with:
           context: ${{ inputs.context }}
