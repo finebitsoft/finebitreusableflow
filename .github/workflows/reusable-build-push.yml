@@ -39,6 +39,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # --- Build Angular frontend if frontend_path is provided ---
+      - name: Build Angular Frontend
+        if: ${{ inputs.frontend_path != '' }}
+        run: |
+          cd ${{ inputs.frontend_path }}
+          npm ci
+          npm run build -- --configuration=production --base-href=/finebitcommercialservice/ --deploy-url=/finebitcommercialservice/
+          echo "Copying frontend build to backend static folder"
+          rm -rf ../${{ inputs.backend_path }}/src/main/resources/static/*
+          cp -r dist/* ../${{ inputs.backend_path }}/src/main/resources/static/
+
+      # --- Set up JDK for backend build ---
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -46,12 +58,16 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build and Package
-        run: ./mvnw clean package -B -DskipTests
+      # --- Build and package backend ---
+      - name: Build Backend
+        run: |
+          cd ${{ inputs.backend_path }}
+          ./mvnw clean package -B -DskipTests
         env:
           JWT_PRIVATE_KEY: ${{ secrets.jwt_private_key }}
           JWT_PUBLIC_KEY: ${{ secrets.jwt_public_key }}
 
+      # --- Docker login ---
       - name: Dockerhub Login
         if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/login-action@v2
@@ -59,6 +75,7 @@ jobs:
           username: ${{ secrets.docker_hub_username }}
           password: ${{ secrets.docker_hub_password }}
 
+      # --- Extract Docker metadata ---
       - name: Extract metadata for Docker
         if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         id: meta
@@ -66,6 +83,7 @@ jobs:
         with:
           images: ${{ vars.REGISTRY }}/${{ inputs.image_name }}
 
+      # --- Build and push Docker image ---
       - name: Build and Push Docker Image
         if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/build-push-action@v4
