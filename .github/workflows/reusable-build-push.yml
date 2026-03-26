@@ -16,6 +16,18 @@ on:
       frontend_path:
         required: false
         type: string
+      frontend_env:
+        required: false
+        type: string
+        default: production
+      frontend_base_href:
+        required: false
+        type: string
+        default: /
+      frontend_deploy_url:
+        required: false
+        type: string
+        default: /
     secrets:
       docker_hub_username:
         required: true
@@ -44,11 +56,28 @@ jobs:
         if: ${{ inputs.frontend_path != '' }}
         run: |
           cd ${{ inputs.frontend_path }}
-          npm ci
-          npm run build -- --configuration=production --base-href=/finebitcommercialservice/ --deploy-url=/finebitcommercialservice/
-          echo "Copying frontend build to backend static folder"
-          rm -rf ../${{ inputs.backend_path }}/src/main/resources/static/*
-          cp -r dist/* ../${{ inputs.backend_path }}/src/main/resources/static/
+
+          # Use npm ci if package-lock.json exists, otherwise npm install
+          if [ -f package-lock.json ]; then
+            echo "Using npm ci"
+            npm ci
+          else
+            echo "package-lock.json not found, using npm install"
+            npm install
+          fi
+
+          # Build Angular with inputs for configuration, base-href, deploy-url
+          echo "Building Angular frontend with ENV=${{ inputs.frontend_env }}, BASE_HREF=${{ inputs.frontend_base_href }}, DEPLOY_URL=${{ inputs.frontend_deploy_url }}"
+          npm run build -- --configuration=${{ inputs.frontend_env }} \
+            --base-href=${{ inputs.frontend_base_href }} \
+            --deploy-url=${{ inputs.frontend_deploy_url }}
+
+          # Copy build output to backend static folder
+          if [ -n "${{ inputs.backend_path }}" ]; then
+            echo "Copying frontend build to backend static folder"
+            rm -rf ../${{ inputs.backend_path }}/src/main/resources/static/*
+            cp -r dist/* ../${{ inputs.backend_path }}/src/main/resources/static/
+          fi
 
       # --- Set up JDK for backend build ---
       - name: Set up JDK 21
@@ -60,6 +89,7 @@ jobs:
 
       # --- Build and package backend ---
       - name: Build Backend
+        if: ${{ inputs.backend_path != '' }}
         run: |
           cd ${{ inputs.backend_path }}
           ./mvnw clean package -B -DskipTests
