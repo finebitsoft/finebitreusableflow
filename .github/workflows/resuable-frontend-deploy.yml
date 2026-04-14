@@ -1,0 +1,30 @@
+name: Frontend Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+      artifact_name:
+        required: true
+        type: string
+
+    secrets:
+      RENDER_DEPLOY_HOOK:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - name: Deploy to Render (${{ inputs.environment }})
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"

@@ -1,0 +1,49 @@
+name: Frontend Build
+
+on:
+  workflow_call:
+    inputs:
+      build_command:
+        required: true
+        type: string
+
+      artifact_name:
+        required: false
+        type: string
+        default: frontend-dist
+
+      artifact_path:
+        required: false
+        type: string
+        default: dist/
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type Check
+        run: npm run type-check
+
+      - name: Build App
+        run: ${{ inputs.build_command }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_path }}
