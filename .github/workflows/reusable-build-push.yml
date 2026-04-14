@@ -66,9 +66,17 @@ jobs:
             npm install
           fi
 
-          # Build Angular with inputs for configuration, base-href, deploy-url
-          echo "Building Angular frontend with ENV=${{ inputs.frontend_env }}, BASE_HREF=${{ inputs.frontend_base_href }}, DEPLOY_URL=${{ inputs.frontend_deploy_url }}"
-          npm run build -- --configuration=${{ inputs.frontend_env }} \
+          # ----------------------------
+          # Frontend ENV fallback logic
+          # ----------------------------
+          FRONTEND_ENV="${{ inputs.frontend_env }}"
+          if [ -z "$FRONTEND_ENV" ]; then
+            FRONTEND_ENV="production"
+          fi
+
+          echo "Building Angular frontend with ENV=$FRONTEND_ENV, BASE_HREF=${{ inputs.frontend_base_href }}, DEPLOY_URL=${{ inputs.frontend_deploy_url }}"
+
+          npm run build -- --configuration=$FRONTEND_ENV \
             --base-href=${{ inputs.frontend_base_href }} \
             --deploy-url=${{ inputs.frontend_deploy_url }}
 
@@ -78,7 +86,6 @@ jobs:
             rm -rf ../${{ inputs.backend_path }}/src/main/resources/static/*
             cp -r dist/* ../${{ inputs.backend_path }}/src/main/resources/static/
           fi
-
       # --- Set up JDK for backend build ---
       - name: Set up JDK 21
         uses: actions/setup-java@v4
