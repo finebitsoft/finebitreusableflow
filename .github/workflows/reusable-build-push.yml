@@ -6,28 +6,36 @@ on:
       image_name:
         required: true
         type: string
+
       context:
         required: false
         type: string
         default: .
+
       backend_path:
         required: false
         type: string
+
       frontend_path:
         required: false
         type: string
+
+      # 🔥 STANDARDIZED ENV (ONLY dev | int | prod)
       frontend_env:
         required: false
         type: string
-        default: production
+        default: dev
+
       frontend_base_href:
         required: false
         type: string
         default: /
+
       frontend_deploy_url:
         required: false
         type: string
         default: /
+
     secrets:
       docker_hub_username:
         required: true
@@ -41,6 +49,7 @@ on:
 jobs:
   build-push:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
@@ -51,30 +60,31 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # --- Build Angular frontend if frontend_path is provided ---
+      # ----------------------------
+      # FRONTEND BUILD
+      # ----------------------------
       - name: Build Angular Frontend
         if: ${{ inputs.frontend_path != '' }}
         run: |
           cd ${{ inputs.frontend_path }}
 
-          # Use npm ci if package-lock.json exists, otherwise npm install
           if [ -f package-lock.json ]; then
-            echo "Using npm ci"
             npm ci
           else
-            echo "package-lock.json not found, using npm install"
             npm install
           fi
 
           # ----------------------------
-          # Frontend ENV fallback logic
+          # VALIDATE ENV
           # ----------------------------
           FRONTEND_ENV="${{ inputs.frontend_env }}"
-          if [ -z "$FRONTEND_ENV" ]; then
-            FRONTEND_ENV="production"
+
+          if [[ "$FRONTEND_ENV" != "dev" && "$FRONTEND_ENV" != "int" && "$FRONTEND_ENV" != "prod" ]]; then
+            echo "❌ Invalid FRONTEND_ENV=$FRONTEND_ENV (must be dev | int | prod)"
+            exit 1
           fi
 
-          echo "Building Angular frontend with ENV=$FRONTEND_ENV, BASE_HREF=${{ inputs.frontend_base_href }}, DEPLOY_URL=${{ inputs.frontend_deploy_url }}"
+          echo "🚀 Building Angular frontend with ENV=$FRONTEND_ENV"
 
           npm run build -- --configuration=$FRONTEND_ENV \
             --base-href=${{ inputs.frontend_base_href }} \
@@ -86,15 +96,21 @@ jobs:
             rm -rf ../${{ inputs.backend_path }}/src/main/resources/static/*
             cp -r dist/* ../${{ inputs.backend_path }}/src/main/resources/static/
           fi
-      # --- Set up JDK for backend build ---
+
+      # ----------------------------
+      # SETUP JAVA
+      # ----------------------------
       - name: Set up JDK 21
+        if: ${{ inputs.backend_path != '' }}
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
 
-      # --- Build and package backend ---
+      # ----------------------------
+      # BACKEND BUILD
+      # ----------------------------
       - name: Build Backend
         if: ${{ inputs.backend_path != '' }}
         run: |
@@ -104,25 +120,31 @@ jobs:
           JWT_PRIVATE_KEY: ${{ secrets.jwt_private_key }}
           JWT_PUBLIC_KEY: ${{ secrets.jwt_public_key }}
 
-      # --- Docker login ---
+      # ----------------------------
+      # DOCKER LOGIN
+      # ----------------------------
       - name: Dockerhub Login
-        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/int') || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.docker_hub_username }}
           password: ${{ secrets.docker_hub_password }}
 
-      # --- Extract Docker metadata ---
+      # ----------------------------
+      # METADATA
+      # ----------------------------
       - name: Extract metadata for Docker
-        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/int') || startsWith(github.ref, 'refs/heads/hotfix/')
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ vars.REGISTRY }}/${{ inputs.image_name }}
 
-      # --- Build and push Docker image ---
+      # ----------------------------
+      # BUILD & PUSH IMAGE
+      # ----------------------------
       - name: Build and Push Docker Image
-        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/develop') || startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/int') || startsWith(github.ref, 'refs/heads/hotfix/')
         uses: docker/build-push-action@v4
         with:
           context: ${{ inputs.context }}
