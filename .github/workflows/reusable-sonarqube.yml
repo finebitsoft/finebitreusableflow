@@ -43,4 +43,4 @@ jobs:
           -Dsonar.organization=${{ inputs.sonar_organization_key }} \
           -Dsonar.projectKey=${{ inputs.sonar_project_key }} \
           -Dsonar.host.url=${{ inputs.sonar_url }} \
-          -Dsonar.login=${{ secrets.sonar_token }}
+          -Dsonar.token=${{ secrets.sonar_token }}
