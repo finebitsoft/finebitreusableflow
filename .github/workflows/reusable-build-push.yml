@@ -86,7 +86,7 @@ jobs:
 
           echo "🚀 Building Angular frontend with ENV=$FRONTEND_ENV"
 
-          npm run build -- --configuration=$FRONTEND_ENV \
+             npm run build:$FRONTEND_ENV -- \
             --base-href=${{ inputs.frontend_base_href }} \
             --deploy-url=${{ inputs.frontend_deploy_url }}
 
